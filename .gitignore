@@ -1,0 +1,7 @@
+# .gitignore (Admin Portal)
+node_modules/
+.env
+.DS_Store
+dist/
+.vscode/
+package-lock.json
