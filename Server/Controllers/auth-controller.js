@@ -1,7 +1,7 @@
 import User from "../models/regis-model.js";
 import Contact from "../models/contact-model.js";
 import service from "../models/service-model.js"; 
-import bcrypt from "bcryptjs";
+import Session from "../models/session-model.js";
 
 //1. Home Logic
 const home=async(req,res)=>{
@@ -59,10 +59,22 @@ const register=async(req,res,next)=>{
             phone,
             password,
         });
+        //Generate the token with the intance method
+        const token=await usercreated.generateToken();
+        //Send JWT as cookie
+       res.cookie("accessToken", token, {
+       httpOnly: true,
+       secure: process.env.NODE_ENV === "production",
+       sameSite: "strict",
+       maxAge: 15 * 60 * 1000, // 15 minutes
+       path: "/",
+        });
+
         res.status(201).json(
             {
              msg:"Registration Successful",
-             token:await usercreated.generateToken(),
+             //Calling the instance method  for generateToken()
+            //  token:await usercreated.generateToken(),
              userId:usercreated._id.toString(),
             }
         ); 
@@ -78,66 +90,141 @@ const register=async(req,res,next)=>{
     }
 }
 
-//3. Login Route Logic
-const login=async(req,res,next)=>{
-    try{
-      // Destructuring the body
-      const{email,password}=req.body;
-      const userExit= await User.findOne({email});
-      //Print the corresponding email document on the screen
-      console.log(userExit);
-      if(!userExit)
-      {
-        // return res.status(400).json({mess:"Firstly Done the Registration then try to Login"});
-       const status=400;
-       const message="Firstly Done the Registration then try to Login";
-       const error={
-         status,
-         message,
-       }
-        next(error);
-      }
+// //3. Login Route Logic (localStorage based)
+// const login=async(req,res,next)=>{
+//     try{
+//       // Destructuring the body
+//       const{email,password}=req.body;
+//       //Check the email is already exist or not in the database
+//       const userExit= await User.findOne({email});
+//       //Print the corresponding email document on the screen
+//       console.log(userExit);
+//       if(!userExit)
+//       {
+//         // return res.status(400).json({mess:"Firstly Done the Registration then try to Login"});
+//        const status=400;
+//        const message="Firstly Done the Registration then try to Login";
+//        const error={
+//          status,
+//          message,
+//        }
+//         next(error);
+//       }
 
-    // Direct calling the compare() from bcrypt pakage without using instance method bcrypt.compare() return true if password match
-    // const user=await bcrypt.compare(password,userExit.password);
+//     // Direct calling the compare() from bcrypt pakage without using instance method bcrypt.compare() return true if password match
+//     // const user=await bcrypt.compare(password,userExit.password);
        
-       //password come through req.body (Destucturing above) 
-      //Calling the instance method for comparePassword()
-      const user=await userExit.comparePassword(password);
-      if(user)
-      {
-        res.status(200).json({
-           mssg:"Login Successfull",
-           //Calling the instance method  for generateToken()
-           token: await userExit.generateToken(),
-           user_id:userExit.id.toString(), 
-        });
-      }
-      else
-      {
-        // res.status(401).json({message:"Invalid email or Password"});
-        const status=401;
-        const message="Incorrect Password";
-        const extraDetails="You enter password is incorrect check the password carefully"; 
-        const error=
-        {
-          status,
-          message,
-          extraDetails,
-        }
-        next(error);
-      }
+//        //password come through req.body (Destucturing above) 
+       
+//       //Calling the instance method for comparePassword()
+//       const user=await userExit.comparePassword(password);
+//       if(user)
+//       {
+//         const token=await userExit.generateToken();
+        
+//        //CREATE SESSION HERE when user try to login
+//        //This line create a document in the session Collection
+//        await Session.create({
+//         userId: userExit._id,
+//         token: token,
+//       });
+//       //SEND TOKEN AS COOKIE (NEW PART)
+//       res.cookie("accessToken", token, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === "production",
+//       sameSite: "strict",
+//       maxAge: 15 * 60 * 1000, // 15 minutes
+//       path: "/",
+//       });
+
+//     res.status(200).json({
+//            mssg:"Login Successfull",
+//            //Calling the instance method  for generateToken()
+//           //  token: token,
+//            user_id:userExit.id.toString(), 
+//         });
+//       }
+//       else
+//       {
+//         // res.status(401).json({message:"Invalid email or Password"});
+//         const status=401;
+//         const message="Incorrect Password";
+//         const extraDetails="You enter password is incorrect check the password carefully"; 
+//         const error=
+//         {
+//           status,
+//           message,
+//           extraDetails,
+//         }
+//         next(error);
+//       }
+//     }
+//     catch(error)
+//     {
+//         // res.status(500).json({mess:"Internal Server Error"});
+//         const message="Internal Server Error";
+//         const err={
+//          message,
+//        }
+//         next(err);
+//     }
+// }
+// 3. Login Route Logic (COOKIE BASED)
+const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    // 1️⃣ Check user exists
+    const userExit = await User.findOne({ email });
+    if (!userExit) {
+      return next({
+        status: 400,
+        message: "Firstly do the registration then try to login",
+      });
     }
-    catch(error)
-    {
-        // res.status(500).json({mess:"Internal Server Error"});
-        const message="Internal Server Error";
-        const err={
-         message,
-       }
-        next(err);
+
+    // 2️⃣ Compare password
+    const isMatch = await userExit.comparePassword(password);
+    if (!isMatch) {
+      return next({
+        status: 401,
+        message: "Incorrect Password",
+        extraDetails: "You entered password is incorrect",
+      });
     }
-}
+
+    // 3️⃣ Generate JWT
+    const token = await userExit.generateToken();
+
+    // 4️⃣ Create active session
+    await Session.create({
+      userId: userExit._id,
+      token: token,
+      isActive: true,
+    });
+
+    // 5️⃣ Send JWT as HttpOnly cookie
+    res.cookie("accessToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // NODE_ENV = development
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      path: "/",
+    });
+
+    // 6️⃣ Response (NO token in body)
+    res.status(200).json({
+      message: "Login Successful",
+      user_id: userExit._id.toString(),
+    });
+
+  } catch (error) {
+    next({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+};
 
 // 4.Create Contact Route logic
 const contactForm=async (req,res,next)=>{
@@ -198,5 +285,49 @@ const services=async(req,res)=>{
   console.log(`error from the user route ${error}`);
  }
 } 
+// 7. Logout Route Logic (COOKIE BASED)
+const logout = async (req, res, next) => {
+  try {
+    // 1️⃣ Deactivate all sessions of this user (your logic stays)
+    await Session.updateMany(
+      { userId: req.userID },
+      { isActive: false }
+    );
+
+    // 2️⃣ CLEAR JWT COOKIE ✅
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", //NODE_ENV = development
+      sameSite: "strict",
+      path: "/",
+    });
+
+    //Response
+    res.status(200).json({ message: "Logged out successfully" });
+
+  } catch (error) {
+    next({
+      status: 500,
+      message: "Logout failed",
+    });
+  }
+};
+// // 7. Logout Route Logic
+// const logout = async (req, res, next) => {
+//   try {
+//     await Session.updateMany(
+//       { userId: req.userID },
+//       { isActive: false }
+//     );
+//     res.status(200).json({ message: "Logged out successfully" });
+//   } catch (error) {
+//     next({
+//       status: 500,
+//       message: "Logout failed",
+//     });
+//   }
+// };
+
+
 export default home;
-export {register,login,contactForm,user,services};
+export {register,login,contactForm,user,services, logout};

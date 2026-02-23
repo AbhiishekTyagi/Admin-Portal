@@ -5,7 +5,7 @@ function AdminContacts()
 {
   const[contactData,setData]=useState([]);
   //Get the Gloabal Authoricationtoken from useAuth() context hook method
-  const {Authorizationtoken,API}=useAuth();
+  const {API}=useAuth();
 
 const getAllContact=async()=>
     {
@@ -13,9 +13,7 @@ const getAllContact=async()=>
     const response=await fetch(`${API}/api/admin/contacts`,
     {
       method:"GET",
-      headers:{
-        Authorization:Authorizationtoken,
-      },
+      credentials:"include",
     });
     const contactdata=await response.json();
       if (!response.ok) {
@@ -40,9 +38,7 @@ async function deleteContactById(id)
     `${API}/api/admin/delete/contact/${id}`,
      {
        method:"DELETE",
-       headers:{
-        Authorization:Authorizationtoken,
-       }
+       credentials:"include",
    },
 );
 const data=await response.json();

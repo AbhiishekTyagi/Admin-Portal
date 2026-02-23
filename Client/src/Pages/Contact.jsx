@@ -50,6 +50,7 @@ export const Contact = () => {
             headers:{
                 "Content-Type":"application/json",
             },
+            credentials: "include", // ✅ REQUIRED FOR COOKIES
             body:JSON.stringify(contact),
           });
           const res_data=await response.json();

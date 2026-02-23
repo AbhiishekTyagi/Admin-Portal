@@ -9,18 +9,16 @@ function AdminUsers()
  // Use useState() to store the data come from server response
  const [users,setUser]=useState([]); 
 
- const {Authorizationtoken,API}=useAuth();
+ const {API}=useAuth();
 
  //controller for get all user data
  const getAllUsersData=async()=>{
   try{
   const response=await fetch(`${API}/api/admin/users`,{
     method:"GET",
-    headers:{
-        Authorization:Authorizationtoken,
-    },
+    credentials:"include", //Allow the browser send the token with fetch() request
   });
-   //Network stream
+   // Network stream
   const data=await response.json();
   if (!response.ok) {
     // yahan toast dikhana better
@@ -45,9 +43,7 @@ function AdminUsers()
     `${API}/api/admin/delete/${id}`,
      {
        method:"DELETE",
-       headers:{
-        Authorization:Authorizationtoken,
-       }
+       credentials:"include",
    },
 );
 const data=await response.json();

@@ -13,11 +13,12 @@ function  AdminUpdate()
   //Using params to get the id from the url
   //<Link to={`/admin/users/${curUser._id}/edit`}>
 
+  //useParams() return a object
   const params=useParams();
   //To check what on params
   console.log("params on console",params);
   // Get this method with custom hook that define in Global Access
-  const {Authorizationtoken,API}=useAuth(); 
+  const {API}=useAuth(); 
   
 
  //Update the specific user on delete button
@@ -29,9 +30,7 @@ function  AdminUpdate()
     `${API}/api/admin/users/${params.id}`,
      {
        method:"GET",
-       headers:{
-        Authorization:Authorizationtoken,
-       }
+       credentials:"include", //Pass the cookie token to the server with fetch()
    },
 );
 const data=await response.json();
@@ -77,8 +76,8 @@ function handleChange(event)
        method:"PATCH",
        headers:{
         "Content-Type":"application/json",
-        Authorization:Authorizationtoken,
        },
+    credentials:"include",
     body:JSON.stringify(userdata),
     });
    if(response.ok)
